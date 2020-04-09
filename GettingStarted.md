@@ -14,6 +14,10 @@ YCAM3Dの制御ソフトウェア**RoVI**の環境構築から実行までの手
 ## OS
 - Ubuntu 16.xx
 - LinuxMint 18.x
+  - ROSインストール時、/etc/apt/sources.list.d/ros-latest.listにubuntuのコードを書かないとエラーになることに注意(以下のxenialの部分)
+  
+    deb http://packages.ros.org/ros/ubuntu xenial main
+
 ## ROS
 - Kinetic
 ## Nodejs
@@ -21,6 +25,16 @@ YCAM3Dの制御ソフトウェア**RoVI**の環境構築から実行までの手
 
 # 3.設定
 
+## 環境変数を追加  
+bashrcに以下を追加
+1. ハードウェアアクセラレーションをOFFにする（Intelのグラフィックチップを使っている場合に実施した方が良いみたい）
+~~~
+export LIBGL_ALWAYS_SOFTWARE=1
+~~~
+2. rvizが重くなる現象への対応
+~~~
+export ORGE_RTT_MODE=Copy
+~~~
 ## GigEインターフェース設定
 - アドレス設定  
 YCAM3Dの出荷時IPアドレスは*192.168.222.10*となっています。PC側のインタフェースもそれに合わせます。例えばPC側を*192.168.222.100*とした時の主な設定は以下のようになります。
@@ -114,12 +128,7 @@ catkin_make
 ### RoVIソースのチェックアウト 
 ~~~
 cd ~/catkin_ws/src
-git clone --depth 1 https://github.com/YOODS/rovi.git
-~~~
-ramielブランチを確認
-~~~
-roscd rovi
-git branch
+git clone -b israfel https://github.com/YOODS/rovi.git
 ~~~
 次に必要なソフトウェアをインストールします。
 
@@ -149,12 +158,22 @@ sudo apt-get install nodejs
 - Nodejsパッケージのインストール  
 必要なパッケージ
 <table>
-<tr><td>パッケージ名<td>インストール方法<td>備考
-<tr><td>rosnodejs<td>npm install rosnodejs<td>インストール後、追加の処理があります
-<tr><td>js-yaml<td>npm install js-yaml
-<tr><td>mathjs<td>npm install mathjs
-<tr><td>shm-typed-array<td>npm install shm-typed-array
+<tr><td>パッケージ名<td>備考
+<tr><td>rosnodejs<td>インストール後、追加の処理があります
+<tr><td>js-yaml<td>
+<tr><td>mathjs<td>
+<tr><td>shm-typed-array<td>
+<tr><td>terminate<td>
 </table>
+
+インストール
+~~~
+npm install rosnodejs
+npm install js-yaml
+npm install mathjs
+npm install shm-typed-array
+npm install terminate
+~~~
 
 - rosnodejsインストール後の追加の処理  
 *上記でインストールされるrosnodejsは、
@@ -173,10 +192,18 @@ cp -a ~/rosnodejs/src/ dist
 ### Pythonパッケージのインストール
 必要なパッケージ
 <table>
-<tr><td>パッケージ名<td>インストール方法
-<tr><td>Scipy<td>pip install scipy --user
-<tr><td>Open3D<td>pip install open3d-python --user
+<tr><td>パッケージ名<td>備考
+<tr><td>Scipy<td>
+<tr><td>Open3D<td>
 </table>
+
+インストール
+~~~
+sudo apt install python-pip
+pip install pip==9.0.3 --user
+pip install scipy --user
+pip install open3d-python --user
+~~~
 
 ### ビルド
 
@@ -189,7 +216,17 @@ catkin_make
 
 # RoVIの実行手順
 
-## 起動
+## 起動  
+！ROSのソースディレクトリが **~/catkin_ws/** 以外のときは、以下のrovi/launch/ycam3loader.shの4行目を変更します。
+~~~
+#!/bin/bash
+
+source /opt/ros/kinetic/setup.bash
+source ~/catkin_ws/devel/setup.bash
+
+export ROS_NAMESPACE=/rovi
+~~~
+
 1.3M pixelモード
 ~~~
 roslaunch rovi ycam3sxga.launch

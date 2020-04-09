@@ -11,30 +11,26 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   stereo_msgs
   cv_bridge
+  tf2_ros
   message_generation
   image_geometry
 )
 find_package(OpenCV REQUIRED)
+find_package(Eigen3 REQUIRED)
 
 add_service_files(
   FILES
-  Dialog.srv
-  DigitalFilter.srv
   ImageFilter.srv
   GenPC.srv
-  GetGrid.srv
-  GetCalibs.srv
-  GetParam.srv
-  SetParam.srv
-  SetPose.srv
-  Detect2D.srv
 )
 
 add_message_files(
   FILES
   Floats.msg
-  PickingPose.msg
+  StringArray.msg
 )
+
+#catkin_python_setup()
 
 generate_messages(
   DEPENDENCIES
@@ -47,7 +43,7 @@ generate_messages(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES
-  CATKIN_DEPENDS roscpp std_msgs geometry_msgs sensor_msgs stereo_msgs cv_bridge image_geometry
+  CATKIN_DEPENDS roscpp std_msgs geometry_msgs sensor_msgs stereo_msgs cv_bridge tf2_ros image_geometry
   DEPENDS OpenCV
 )
 
@@ -59,6 +55,7 @@ include_directories(
   include
   ${catkin_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIRS}
 )
 
 link_directories(
@@ -74,13 +71,6 @@ add_definitions("-std=c++11")
 
 #add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-#add_executable(${PROJECT_NAME}_node src/rovi_node.cpp)
-#add_executable(grid_node src/grid_node.cpp src/libs/CircleCalibBoard.cpp)
-
-#add_executable(main_node src/main_node.cpp)
-#target_link_libraries(main_node ${catkin_LIBRARIES})
-#add_dependencies(main_node rovi_gencpp)
-
 add_executable(remap_node src/remap_node.cpp)
 target_link_libraries(remap_node ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 add_dependencies(remap_node rovi_gencpp)
@@ -92,14 +82,6 @@ add_dependencies(genpc_node rovi_gencpp)
 add_executable(grid_node src/grid_node.cpp)
 target_link_libraries(grid_node ${catkin_LIBRARIES} yds3d ${OpenCV_LIBRARIES})
 add_dependencies(grid_node rovi_gencpp)
-
-add_executable(tools_node src/tools_node.cpp)
-target_link_libraries(tools_node ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
-add_dependencies(tools_node rovi_gencpp)
-
-add_executable(depth_node src/depth_node.cpp)
-target_link_libraries(depth_node ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
-add_dependencies(depth_node rovi_gencpp)
 
 add_executable(floats2pc src/floats2pc.cpp)
 target_link_libraries(floats2pc ${catkin_LIBRARIES})
@@ -114,10 +96,9 @@ add_dependencies(floats2pc rovi_gencpp)
 
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
-# install(PROGRAMS
-#   scripts/my_python_script
-#   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
+#install(PROGRAMS
+#  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+#)
 
 ## Mark executables and/or libraries for installation
 # install(TARGETS ${PROJECT_NAME} ${PROJECT_NAME}_node

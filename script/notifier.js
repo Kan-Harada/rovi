@@ -37,6 +37,8 @@ class Notifier extends EventEmitter{
   }
   raise(param,diff,cb){
     switch(arguments.length){
+    case 0:
+      param=Object.assign({},this.objs);
     case 1:
       diff=false;
     case 2:
@@ -110,10 +112,14 @@ class Notifier extends EventEmitter{
     let c={};
     for(let k in obj){
       if (this.objs.hasOwnProperty(k)){
-        if(this.objs[k]!=c[k]) c[k]=this.objs[k];
+        if(this.objs[k]!=obj[k]) c[k]=obj[k];
       }
+      else c[k]=obj[k];
     }
     return c;
+  }
+  async param(){
+    return await this.ros.getParam(this.ns);
   }
 }
 

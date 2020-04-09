@@ -1,0 +1,24 @@
+title X1 transaction
+
+App->YCam control: X1
+YCam control->+Streaming control:stop
+App->YCam control: X1
+note right of Streaming control: retrieving images\nwith timeout
+Streaming control-->-YCam control:
+note right of YCam control: o2->Ycam 
+par pattern sequence
+YCam control->YCam control:watch dog
+else
+YCam control->+Image switcher:store
+Image switcher-->-YCam control:images[13]
+end
+alt watch dog timeout
+YCam control->App:Y1 [False]
+else
+YCam control->+genpc:call
+genpc->App:pointcloud
+genpc-->-YCam control:
+YCam control->App:Y1 [True]
+end
+YCam control->Image switcher:pass thru
+YCam control->Streaming control:start
