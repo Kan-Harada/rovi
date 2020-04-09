@@ -52,7 +52,7 @@ exports.assign=function(sens){
     if(sens.reqR_>2) sens.toutR_++;
     else sens.toutR_=0;
     if(sens.toutL_>2 || sens.toutR_>2){
-      sens.emit('timeout');
+//      sens.emit('timeout');
       sens.streaming=null;
       return;
     }

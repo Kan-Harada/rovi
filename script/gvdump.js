@@ -63,5 +63,6 @@ exports.dump=function(){
   else if (resolution == 'sxga') {
     yamlstr = sxga_yamlstr;
   }
+  console.log(yamlstr);
   return yamlstr;
 }

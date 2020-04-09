@@ -31,6 +31,7 @@ const reg_table = {
   'GainAnalog': 0x00101008,
   'Gain': 0x0010100C,
   'TriggerMode': 0x00101010,
+  'CaptureCnt': 0x00100020,
   'SerialPort': 0x00300004,
   'SoftwareTriggerRate': 0
 }
@@ -93,10 +94,7 @@ var ycam = {
       let greq = new gev_srvs.GevRegs.Request();
       greq.address = reg_table['SerialPort'];
       let lsb = ycam.pregbuf.charCodeAt(0);
-      const buffer = new ArrayBuffer(4);
-      const view = new DataView(buffer);
-      view.setUint32(0,(~lsb<<16)|lsb);
-      greq.data = view.getUint32(0);
+      greq.data = (~lsb << 16) | lsb;
       try {
         await run_c.reg_write.call(greq);
         ycam.pstat=true;
@@ -133,12 +131,18 @@ var ycam = {
         break;
       case 'Go':
         str += 'o' + obj[key] + '\n';
+        ros.log.info('Live: '+obj[key]);
         break;
       case 'Inv':
         str += 'b' + obj[key] + '\n';
         break;
       case 'Mode':
         str += 'z' + obj[key] + '\n';
+        ros.log.info('Pattern Mode '+obj[key]);
+        break;
+      case 'Mode2':
+        str += 'a' + obj[key] + '\n';
+        ros.log.info('Projector Mode Changed: '+obj[key]);
         break;
       case 'Reset':
       case 'Init':
@@ -151,6 +155,7 @@ var ycam = {
     ycam.pregbuf += str;
     if(bs>0 || !ycam.pstat) return ret;
     ycam.pregwrt();
+//     await sleep(1000);
     return ret;
   },
   normal: false,
@@ -190,7 +195,7 @@ var ycam = {
         Notifier.emit('wake');
         ycam.cstat=ycam.pstat=true;
         ycam.pregbuf='';
-      },1000);
+      },2000);
     });
     run_c.on('stop', async function() {
       Notifier.emit('shutdown','camera stopped');
@@ -210,7 +215,7 @@ var ycam = {
       else{
         setTimeout(function(){
           run_c.emit('restart');
-        },1000);
+        },2000);
       }
     });
     this.scan();
@@ -330,4 +335,3 @@ async function openCamera(rosrun, ns) {
 }
 
 module.exports = ycam;
-

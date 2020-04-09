@@ -4,12 +4,23 @@ const std_msgs = ros.require('std_msgs').msg;
 const std_srvs = ros.require('std_srvs').srv;
 const rovi_srvs = ros.require('rovi').srv;
 const EventEmitter = require('events').EventEmitter;
+const fs = require('fs');
+
+function topgm(img,fn) {
+  let cap = new Uint8Array(img.data);
+  return new Promise(function(resolve) {
+    fs.writeFileSync(fn + '.pgm', 'P5\n' + img.width.toString() + ' ' + img.height.toString() + '\n' + '255\n');
+    fs.appendFileSync(fn + '.pgm', cap);
+    resolve(true);
+  });
+}
 
 class ImageSwitcher {
   constructor(node, ns) {
     const who = this;
     this.node = node;
     this.ns = ns;
+    this.ns01=(ns.indexOf('left')==-1) ? '_1': '_0';
     this.raw = node.advertise(ns + '/image_raw', sensor_msgs.Image);
     this.rect = node.advertise(ns + '/image_rect', sensor_msgs.Image);
     this.rect0 = node.advertise(ns + '/image_rect0', sensor_msgs.Image);
@@ -58,6 +69,7 @@ class ImageSwitcher {
         if(icnt==count){
           who.pstat=3;
           for(let i=0;i<count;i++){
+             topgm(who.capt[i],'/tmp/raw'+('0'+i).slice(-2)+who.ns01)
             let req=new rovi_srvs.ImageFilter.Request();
             req.img=who.capt[i];
             let res=await who.remap.call(req);

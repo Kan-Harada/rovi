@@ -21,14 +21,14 @@ setImmediate(async function() {
   let subl = rosNode.subscribe('/rovi/left/' + topic, sensor_msgs.Image, async function(src) {
     rosNode.unsubscribe('/rovi/left/' + topic);
     lf++;
-    await topgm(src, 'left' + process.argv[2]);
+    await topgm(src, process.argv[2]+'_0');
     lf++;
     if (rf >= 2) process.exit(0);    
   });
   let subr = rosNode.subscribe('/rovi/right/' + topic, sensor_msgs.Image, async function(src) {
     rosNode.unsubscribe('/rovi/right/' + topic);
     rf++;
-    await topgm(src, 'right' + process.argv[2]);
+    await topgm(src, process.argv[2]+'_1');
     rf++;
     if (lf >= 2) process.exit(0);
   });

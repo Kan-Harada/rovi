@@ -62,7 +62,7 @@ setImmediate(async function() {
     let obj={};
     obj[key]=val;
 //    if(key=='Mode'){
-    if(key!='Go'){
+    if(key!='Go' && key!='Mode2'){
       if(sensEv.streaming){
         await sensEv.scanStop(1000);
         sensEv.lit=false;
@@ -85,7 +85,9 @@ setImmediate(async function() {
   sensEv.on('wake', async function() {
     for(let n in param) await param[n].start();
     param.camlv.raise({TriggerMode:'On'});
-    param.proj.raise({Mode:1});//--- let 13 pattern mode
+    param.proj.raise({Mode2:0});//--- capture-send sync mode
+    await sleep(1000);
+    param.proj.raise({Mode:1});	//--- let 13 pattern mode
     ros.log.warn('NOW ALL READY ');
     pub_info.sendmsg('YCAM ready');
     sensEv.lit=false;
@@ -109,15 +111,19 @@ setImmediate(async function() {
     image_R.emit(img,ts,sensEv.lit);
   });
   sensEv.on('trigger', async function() {
-    if(param.proj.objs.Mode==1){
-      sensEv.lit=true;
-      param.proj.raise({Go:-1});
-    }
-    else{
-      sensEv.lit=!sensEv.lit;
-      if(sensEv.lit) param.proj.raise({Go:1});
-      else param.proj.raise({Go:-1});
-    }
+    sens.cset({'CaptureCnt': 0x01});
+//  if(param.proj.objs.Mode==1){
+//       sensEv.lit=true;
+//       sens.cset({'CaptureCnt': 0x01});
+// //       param.proj.raise({Go:-1});
+//     }
+//     else{
+//       sensEv.lit=!sensEv.lit;
+//         sens.cset({'CaptureCnt': 0x01});
+//         console.log('live2');
+// //       if(sensEv.lit) param.proj.raise({Go:1});
+// //       else param.proj.raise({Go:-1});
+//     }
     sensEv.fps=param.camlv.objs.SoftwareTriggerRate;
   });
   sensEv.on('timeout', async function() {
@@ -137,7 +143,7 @@ setImmediate(async function() {
       image_R.thru();
       pslock=false;
     },tp);
-    param.camlv.raise(param.camps.diff(param.camlv.objs));//---restore overwritten camera params
+    param.camlv.raise(param.camlv.diff(param.camps.objs));//---restore overwritten camera params
   }
   let psgenpc = function(req,res){
     if(!sens.normal){
@@ -154,10 +160,12 @@ setImmediate(async function() {
       pslock=true;
       await sensEv.scanStop(1000); //---wait stopping stream with 1000ms timeout
       ros.log.info('Streaming stopped');
-      await sens.cset(param.camlv.diff(await param.camps.param())); //---overwrites genpc camera params
-      let dpj=param.proj.diff(await param.proj.param());
-      ros.log.info("Proj param "+JSON.stringify(dpj));
-      await sens.pset(dpj); //---overwrites genpc projector params
+
+      let obj={};
+      obj['Mode2']=1;
+      await sens.pset(obj);
+// 	  param.proj.raise({Mode2:1});//--- capture-send sync mode
+      await sens.cset(param.camps.objs); //---overwrites genpc camera params
       let wdt=setTimeout(async function() { //---start watch dog
         ps2live(1000);
         const errmsg = 'pshift_genpc timed out';
@@ -165,23 +173,32 @@ setImmediate(async function() {
         res.success = false;
         res.message = errmsg;
         pub_Y1.publish(new std_msgs.Bool());
-        param.proj.raise({Mode:1});//---reload 13 pattern
+//        param.proj.raise({Mode:1});//---reload 13 pattern
         resolve(true);
-      }, param.proj.objs.Interval*13 + 2000);
+      }, param.proj.objs.Interval*13 + 1000);
 //for monitoring
-      let icnt=0;
-      image_L.hook.on('store',function(img,t2){
-        let t1=img.header.stamp;
-        ros.log.info(('00'+icnt.toString(10)).substr(-2)+' '+(t1.nsecs*1e-9+t1.secs)+' '+(t2.nsecs*1e-9+t2.secs));
-        icnt++;
-      });
+     let icnt=0;
+     image_L.hook.on('store',function(img,t2){
+       let t1=img.header.stamp;
+       ros.log.info(('00'+icnt.toString(10)).substr(-2)+' '+(t1.nsecs*1e-9+t1.secs)+' '+(t2.nsecs*1e-9+t2.secs));
+       icnt++;
+     });
 //
       ros.log.info('Ready to store');
-      setImmediate(function(){ sens.pset({ 'Go': 2 });});  //---projector starts in the next loop
+      setTimeout(function(){
+          sens.cset({'CaptureCnt': 0x0d});
+//           sens.cset({'CaptureCnt': 0xfff2000d});
+//           sens.cset({'CaptureCnt': 0xfdf2020d});
+        },
+        95
+      );
       await sleep(100);
       let imgs;
       try{
         imgs=await Promise.all([image_L.store(13),image_R.store(13)]); //---switch to "store" mode
+//         imgs=await Promise.all([image_L.store(4),image_R.store(4)]); //---switch to "store" mode
+        obj['Mode2']=0;
+        await sens.pset(obj);
       }
       catch(err){
         const msg="image_switcher::exception";
@@ -193,7 +210,7 @@ setImmediate(async function() {
         resolve(true);
         pub_Y1.publish(new std_msgs.Bool());
         return;
-      }     
+      }
       clearTimeout(wdt);
       let gpreq = new rovi_srvs.GenPC.Request();
       gpreq.imgL = imgs[0];
@@ -203,7 +220,7 @@ setImmediate(async function() {
         ros.log.info("call genpc");
         gpres = await genpc.call(gpreq);
         ros.log.info("ret genpc");
-        res.message = imgs[0].length + ' images scan complete. Generated PointCloud Count=' + gpres.pc_cnt;
+        res.message = imgs[0].length + ' images scan compelete. Generated PointCloud Count=' + gpres.pc_cnt;
         res.success = true;
       }
       catch(err) {
