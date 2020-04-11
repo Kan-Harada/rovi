@@ -140,7 +140,7 @@ roslaunch rovi ycam3vga_mm.launch
 <tr><td>/rovi/pshift_genpc/camera/ExposureTime<td><td>&micro;sec
 <tr><td>/rovi/pshift_genpc/camera/Gain<td>
 <tr><td>/rovi/pshift_genpc/projector/ExposureTime<td>8400の倍数<td>&micro;sec
-<tr><td>/rovi/pshift_genpc/projector/Intencity<td>
+<tr><td>/rovi/pshift_genpc/projector/Intensity<td>
 <tr><td>/rovi/pshift_genpc/projector/Interval<td>SXGAモード:50<br>VGAモード:30<td>msec
 <tr><td>/rovi/pshift_genpc/projector/Mode<td>位相シフト:1<br>ストロボ:2
 <tr><td>/rovi/right/remap/D<td>
@@ -155,11 +155,11 @@ roslaunch rovi ycam3vga_mm.launch
 ## ドキュメントリスト  
 |ドキュメント名|コンテンツ|
 |:----|:----|
-|[GettingStarted.md](GettingStarted.md)|インストール手順についての記載|
-|[GettingStarted-TX2.md](GettingStarted-TX2.md)|Jetson-TX2用インストール手順|
-|[AppDesign.md](AppDesign.md)|roviを利用したアプリケーションの設計について|
-|[CameraDriver.md](CameraDriver.md)|カメラドライバーインタフェースについて|
-|[TopicsDetail.md](TopicsDetail.md)|トピック詳細|
+|GettingStarted.md|インストール手順についての記載|
+|GettingStarted-TX2.md|Jetson-TX2用インストール手順|
+|AppDesign.md|roviを利用したアプリケーションの設計について|
+|CameraDriver.md|カメラドライバーインタフェースについて|
+
 
 ## 動作確認済み環境  
 |OS|Desktop|ROS|STATUS|
