@@ -84,10 +84,10 @@ setImmediate(async function() {
   sensEv=SensControl.assign(sensEv);
   sensEv.on('wake', async function() {
     for(let n in param) await param[n].start();
-    param.camlv.raise({TriggerMode:'On'});
+//     param.camlv.raise({TriggerMode:'On'});
     param.proj.raise({Mode2:0});//--- capture-send sync mode
-    await sleep(1000);
-    param.proj.raise({Mode:1});	//--- let 13 pattern mode
+    await sleep(500);
+//     param.proj.raise({Mode:1});	//--- let 13 pattern mode
     ros.log.warn('NOW ALL READY ');
     pub_info.sendmsg('YCAM ready');
     sensEv.lit=false;
@@ -220,7 +220,7 @@ setImmediate(async function() {
         ros.log.info("call genpc");
         gpres = await genpc.call(gpreq);
         ros.log.info("ret genpc");
-        res.message = imgs[0].length + ' images scan compelete. Generated PointCloud Count=' + gpres.pc_cnt;
+        res.message = imgs[0].length + ' images scan complete. Generated PointCloud Count=' + gpres.pc_cnt;
         res.success = true;
       }
       catch(err) {

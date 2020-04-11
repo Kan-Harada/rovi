@@ -46,9 +46,7 @@ class ImageSwitcher {
       let req=new rovi_srvs.ImageFilter.Request();
       req.img=img;
       let res=await this.remap.call(req);
-      if(lit) this.rect.publish(res.img);
-      else this.rect0.publish(res.img);
-      //this.diff.publish(res.img);                                              // WPC
+      this.rect.publish(res.img);
       break;
     case 2:
       this.hook.emit('store',img,ts);

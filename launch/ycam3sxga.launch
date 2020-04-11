@@ -1,3 +1,6 @@
 <launch>
   <node name="ycam3sxga" pkg="rovi" type="ycam3loader.sh" args="sxga mm" output="screen" />
+<!--
+  <param name="/rovi/genpc/dump" type="string" value="/tmp" />
+-->
 </launch>

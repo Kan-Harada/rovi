@@ -124,7 +124,7 @@ var ycam = {
         case 'Interval':
           str += 'o' + obj[key] + '\n';
           break;
-      case 'Intencity':
+      case 'Intensity':
         let ix = obj[key] < 256 ? obj[key] : 255;
         ix=('00'+ix.toString(16).toUpperCase()).substr(-2);
         str += 'i' + ix + ix + ix + '\n';
@@ -155,7 +155,6 @@ var ycam = {
     ycam.pregbuf += str;
     if(bs>0 || !ycam.pstat) return ret;
     ycam.pregwrt();
-//     await sleep(1000);
     return ret;
   },
   normal: false,

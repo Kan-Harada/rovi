@@ -1,3 +1,8 @@
 <launch>
   <node name="ycam3vga" pkg="rovi" type="ycam3loader.sh" args="vga mm"  output="screen" />
+  <node ns="L" pkg="image_view" type="image_view" name="image_view" args="image:=/rovi/left/image_raw" />
+  <node ns="R" pkg="image_view" type="image_view" name="image_view" args="image:=/rovi/right/image_raw" />
+  <param name="/rovi/genpc/dump" type="string" value="/tmp" />
+<!--
+-->
 </launch>
