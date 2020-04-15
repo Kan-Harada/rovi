@@ -61,13 +61,16 @@ setImmediate(async function() {
   param.proj.on('change',async function(key,val){
     let obj={};
     obj[key]=val;
-//    if(key=='Mode'){
     if(key!='Go' && key!='Mode2'){
-      if(sensEv.streaming){
-        await sensEv.scanStop(1000);
-        sensEv.lit=false;
-        sensEv.scanStart(1000);
-      }
+      let mode2={};
+      mode2['Mode2']=0;
+      await sens.pset(mode2);
+
+//       if(sensEv.streaming){
+//         await sensEv.scanStop(1000);
+//         sensEv.lit=false;
+//         sensEv.scanStart(1000);
+//      }
     }
     await sens.pset(obj);
   });
@@ -82,12 +85,14 @@ setImmediate(async function() {
     break;
   }
   sensEv=SensControl.assign(sensEv);
+// 起動時処理  
   sensEv.on('wake', async function() {
     for(let n in param) await param[n].start();
-//     param.camlv.raise({TriggerMode:'On'});
-    param.proj.raise({Mode2:0});//--- capture-send sync mode
-    await sleep(500);
-//     param.proj.raise({Mode:1});	//--- let 13 pattern mode
+    await sleep(3000)
+    let pat1={};
+    pat1['Mode']=1;
+    await sens.pset(pat1);
+    await sleep(3000);
     ros.log.warn('NOW ALL READY ');
     pub_info.sendmsg('YCAM ready');
     sensEv.lit=false;
@@ -112,18 +117,6 @@ setImmediate(async function() {
   });
   sensEv.on('trigger', async function() {
     sens.cset({'CaptureCnt': 0x01});
-//  if(param.proj.objs.Mode==1){
-//       sensEv.lit=true;
-//       sens.cset({'CaptureCnt': 0x01});
-// //       param.proj.raise({Go:-1});
-//     }
-//     else{
-//       sensEv.lit=!sensEv.lit;
-//         sens.cset({'CaptureCnt': 0x01});
-//         console.log('live2');
-// //       if(sensEv.lit) param.proj.raise({Go:1});
-// //       else param.proj.raise({Go:-1});
-//     }
     sensEv.fps=param.camlv.objs.SoftwareTriggerRate;
   });
   sensEv.on('timeout', async function() {
@@ -164,7 +157,6 @@ setImmediate(async function() {
       let obj={};
       obj['Mode2']=1;
       await sens.pset(obj);
-// 	  param.proj.raise({Mode2:1});//--- capture-send sync mode
       await sens.cset(param.camps.objs); //---overwrites genpc camera params
       let wdt=setTimeout(async function() { //---start watch dog
         ps2live(1000);
@@ -173,7 +165,6 @@ setImmediate(async function() {
         res.success = false;
         res.message = errmsg;
         pub_Y1.publish(new std_msgs.Bool());
-//        param.proj.raise({Mode:1});//---reload 13 pattern
         resolve(true);
       }, param.proj.objs.Interval*13 + 1000);
 //for monitoring
