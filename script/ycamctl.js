@@ -8,18 +8,25 @@ const NScamL = NSrovi+'/left';
 const NScamR = NSrovi+'/right';
 const NSlive = NSrovi+'/live';
 const ros = require('rosnodejs');
-const sensor_msgs = ros.require('sensor_msgs').msg;
-const sensName = process.argv.length < 3 ? 'ycam1s' : process.argv[2];
-const sens = require('./' + sensName + '.js')
 const std_msgs = ros.require('std_msgs').msg;
 const std_srvs = ros.require('std_srvs').srv;
 const rovi_srvs = ros.require('rovi').srv;
 const rovi_msgs = ros.require('rovi').msg;
 const EventEmitter = require('events').EventEmitter;
 const jsyaml = require('js-yaml');
-const ImageSwitcher = require('./image_switcher.js');
 const Notifier = require('./notifier.js');
+const sensor_msgs = ros.require('sensor_msgs').msg;
+
+// ycam3s.jsでYCAM3Dを選択
+const sens = require('./'+process.argv[2]+'.js')
+//画像処理機能
+const ImageSwitcher = require('./image_switcher.js');
+//カメラ制御・イベント受信機能
 const SensControl = require('./sens_ctrl.js');
+//ライブ時のfpsを設定
+const liveFps=2;
+//位相シフト撮影枚数
+const psCnt=13;
 
 function sleep(msec){return new Promise(function(resolve){setTimeout(function(){resolve(true);},msec);});}
 function add_sendmsg(pub){
@@ -31,6 +38,9 @@ function add_sendmsg(pub){
 }
 
 setImmediate(async function() {
+//=============
+// 初期化部
+//=============
   const rosNode = await ros.initNode(NSycamctrl);
   const image_L = new ImageSwitcher(rosNode, NScamL);
   const image_R = new ImageSwitcher(rosNode, NScamR);
@@ -53,6 +63,10 @@ setImmediate(async function() {
     camlv: new Notifier(rosNode,NSlive + '/camera'),  //Live mode camera params
     proj: new Notifier(rosNode,NSps + '/projector') //Genpc projector params
   };
+
+//=============
+// イベント処理部
+//=============
   param.camlv.on('change',async function(key,val){
     let obj={};
     obj[key]=val;
@@ -61,38 +75,28 @@ setImmediate(async function() {
   param.proj.on('change',async function(key,val){
     let obj={};
     obj[key]=val;
-    if(key!='Go' && key!='Mode2'){
-      let mode2={};
-      mode2['Mode2']=0;
-      await sens.pset(mode2);
-
-//       if(sensEv.streaming){
-//         await sensEv.scanStop(1000);
-//         sensEv.lit=false;
-//         sensEv.scanStart(1000);
-//      }
-    }
     await sens.pset(obj);
+    if(key!='Go' && key!='Mode2'){
+      if(sensEv.streaming){
+        await sensEv.scanStop(1000);
+        sensEv.lit=false;
+        sensEv.scanStart(1000);
+     }
+    }
   });
-  let sensEv;
-  switch(sensName){
-  case 'ycam3':
-  case 'ycam3s':
-    sensEv = await sens.open(rosNode, NSrovi, param_camnode);
-    break;
-  case 'ycam1s':
-    sensEv = await sens.open(rosNode,NScamL, NScamR, param.proj.objs.Url, param.proj.objs.Port);
-    break;
-  }
+  let sensEv=await sens.open(rosNode, NSrovi, param_camnode);
   sensEv=SensControl.assign(sensEv);
 // 起動時処理  
   sensEv.on('wake', async function() {
     for(let n in param) await param[n].start();
-    await sleep(3000)
-    let pat1={};
-    pat1['Mode']=1;
+    sensEv.fps=liveFps;
+// プロジェクター外部トリガ無効
+    let mode2={}; mode2['Mode2']=0;
+    await sens.pset(mode2);
+    await sleep(100);
+// プロジェクターに位相シフト撮影パターンを設定
+    let pat1={}; pat1['Mode']=1;
     await sens.pset(pat1);
-    await sleep(3000);
     ros.log.warn('NOW ALL READY ');
     pub_info.sendmsg('YCAM ready');
     sensEv.lit=false;
@@ -117,7 +121,6 @@ setImmediate(async function() {
   });
   sensEv.on('trigger', async function() {
     sens.cset({'CaptureCnt': 0x01});
-    sensEv.fps=param.camlv.objs.SoftwareTriggerRate;
   });
   sensEv.on('timeout', async function() {
     ros.log.error('Image streaming timeout');
@@ -125,10 +128,13 @@ setImmediate(async function() {
     sens.kill();
   });
 
-//---------Definition of services
+//=============
+// サービスの定義
+//=============
   let pslock=true;
   sensEv.on('trigger',function(){ pslock=false; });
   sensEv.on('shutdown',function(){ pslock=true; });
+//ライブ
   let ps2live = function(tp){ //---after "tp" msec, back to live mode
     setTimeout(function(){
       sensEv.scanStart();
@@ -138,6 +144,8 @@ setImmediate(async function() {
     },tp);
     param.camlv.raise(param.camlv.diff(param.camps.objs));//---restore overwritten camera params
   }
+
+//位相シフト撮影
   let psgenpc = function(req,res){
     if(!sens.normal){
       ros.log.warn(res.message='YCAM not ready');
@@ -166,7 +174,7 @@ setImmediate(async function() {
         res.message = errmsg;
         pub_Y1.publish(new std_msgs.Bool());
         resolve(true);
-      }, param.proj.objs.Interval*13 + 1000);
+      }, param.proj.objs.Interval*psCnt + 1000);
 //for monitoring
      let icnt=0;
      image_L.hook.on('store',function(img,t2){
@@ -174,11 +182,11 @@ setImmediate(async function() {
        ros.log.info(('00'+icnt.toString(10)).substr(-2)+' '+(t1.nsecs*1e-9+t1.secs)+' '+(t2.nsecs*1e-9+t2.secs));
        icnt++;
      });
-//
+
       ros.log.info('Ready to store');
       setTimeout(function(){
-          sens.cset({'CaptureCnt': 0x0d});
-//           sens.cset({'CaptureCnt': 0xfff2000d});
+          if(psCnt==13) sens.cset({'CaptureCnt': 0x0d});
+          else if(psCnt==4) sens.cset({'CaptureCnt': 0xfff2000d});
 //           sens.cset({'CaptureCnt': 0xfdf2020d});
         },
         95
@@ -186,8 +194,7 @@ setImmediate(async function() {
       await sleep(100);
       let imgs;
       try{
-        imgs=await Promise.all([image_L.store(13),image_R.store(13)]); //---switch to "store" mode
-//         imgs=await Promise.all([image_L.store(4),image_R.store(4)]); //---switch to "store" mode
+        imgs=await Promise.all([image_L.store(psCnt),image_R.store(psCnt)]); //---switch to "store" mode
         obj['Mode2']=0;
         await sens.pset(obj);
       }
@@ -203,27 +210,29 @@ setImmediate(async function() {
         return;
       }
       clearTimeout(wdt);
-      let gpreq = new rovi_srvs.GenPC.Request();
-      gpreq.imgL = imgs[0];
-      gpreq.imgR = imgs[1];
-      let gpres;
-      try {
-        ros.log.info("call genpc");
-        gpres = await genpc.call(gpreq);
-        ros.log.info("ret genpc");
-        res.message = imgs[0].length + ' images scan complete. Generated PointCloud Count=' + gpres.pc_cnt;
-        res.success = true;
+      if(psCnt==13) {
+        let gpreq = new rovi_srvs.GenPC.Request();
+        gpreq.imgL = imgs[0];
+        gpreq.imgR = imgs[1];
+        let gpres;
+        try {
+          ros.log.info("call genpc");
+          gpres = await genpc.call(gpreq);
+          ros.log.info("ret genpc");
+          res.message = imgs[0].length + ' images scan complete. Generated PointCloud Count=' + gpres.pc_cnt;
+          res.success = true;
+        }
+        catch(err) {
+          res.message = 'genpc failed';
+          res.success = false;
+        }
+        let pcount=new std_msgs.Int32();
+        pcount.data=gpres.pc_cnt;
+        pub_pcount.publish(pcount);
+        let tp=Math.floor(gpres.pc_cnt*0.0001)+10;
+        ros.log.info('Time to publish pc '+tp+' ms');
       }
-      catch(err) {
-        res.message = 'genpc failed';
-        res.success = false;
-      }
-      let pcount=new std_msgs.Int32();
-      pcount.data=gpres.pc_cnt;
-      pub_pcount.publish(pcount);
-      let tp=Math.floor(gpres.pc_cnt*0.0001)+10;
       ps2live(1000);
-      ros.log.info('Time to publish pc '+tp+' ms');
       let finish=new std_msgs.Bool();
       finish.data=res.success;
       pub_Y1.publish(finish);
