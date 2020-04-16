@@ -24,9 +24,11 @@ const ImageSwitcher = require('./image_switcher.js');
 //カメラ制御・イベント受信機能
 const SensControl = require('./sens_ctrl.js');
 //ライブ時のfpsを設定
-const liveFps=2;
+const liveFps=10;
 //位相シフト撮影枚数
 const psCnt=13;
+//ライブON/OFF
+const Livef=1;
 
 function sleep(msec){return new Promise(function(resolve){setTimeout(function(){resolve(true);},msec);});}
 function add_sendmsg(pub){
@@ -36,6 +38,10 @@ function add_sendmsg(pub){
     pub.publish(m);
   }
 }
+process.on('exit',async function() {
+  ros.log.info('ycamctl exiting...');
+  await sleep(1000);
+});
 
 setImmediate(async function() {
 //=============
@@ -99,8 +105,15 @@ setImmediate(async function() {
     await sens.pset(pat1);
     ros.log.warn('NOW ALL READY ');
     pub_info.sendmsg('YCAM ready');
-    sensEv.lit=false;
-    sensEv.scanStart(3000);
+    if(Livef) {
+      sensEv.lit=false;
+      sensEv.scanStart(3000);
+    }
+    else {
+      sens.normal=true;
+      pslock=false;
+    }
+
   });
   sensEv.on('stat', function(f){
     let m=new std_msgs.Bool();
@@ -136,11 +149,12 @@ setImmediate(async function() {
   sensEv.on('shutdown',function(){ pslock=true; });
 //ライブ
   let ps2live = function(tp){ //---after "tp" msec, back to live mode
+    image_L.thru();
+    image_R.thru();
+    pslock=false;
+    if(!Livef) return false;
     setTimeout(function(){
       sensEv.scanStart();
-      image_L.thru();
-      image_R.thru();
-      pslock=false;
     },tp);
     param.camlv.raise(param.camlv.diff(param.camps.objs));//---restore overwritten camera params
   }

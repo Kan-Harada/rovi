@@ -4,12 +4,19 @@ const std_msgs = ros.require('std_msgs').msg;
 const std_srvs = ros.require('std_srvs').srv;
 const EventEmitter = require('events').EventEmitter;
 
+function sleep(msec){return new Promise(function(resolve){setTimeout(function(){resolve(true);},msec);});}
+
 exports.assign=function(sens){
   sens.fps=1;
   sens.reqL_=0;
   sens.reqR_=0;
   sens.toutL_=0;
   sens.toutR_=0;
+  process.on('exit',async function() {
+    ros.log.info('sens_ctl exiting...');
+    sens.scanStop();
+    await sleep(1000);
+  });
   sens.on('shutdown', async function() {
     sens.scanStop();
   });
@@ -45,6 +52,7 @@ exports.assign=function(sens){
       sens.scanDo_();
     },tm);
   }
+// 1枚撮影の実動作部
   sens.scanDo_=function(){
     if(sens.streaming!=null) return;
     if(sens.reqL_>2) sens.toutL_++;
@@ -52,7 +60,6 @@ exports.assign=function(sens){
     if(sens.reqR_>2) sens.toutR_++;
     else sens.toutR_=0;
     if(sens.toutL_>2 || sens.toutR_>2){
-//      sens.emit('timeout');
       sens.streaming=null;
       return;
     }
@@ -61,6 +68,7 @@ exports.assign=function(sens){
       sens.reqL_++;
       sens.reqR_++;
     }
+    //キャプチャ終了→タイムアウト後再度キャプチャ呼出し
     sens.streaming=setTimeout(function(){
       sens.streaming=null;
       sens.scanDo_();

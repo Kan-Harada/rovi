@@ -1,0 +1,3 @@
+#!/bin/sh
+
+while [ 1 ]; do rosservice call /rovi/pshift_genpc; sleep 3; done

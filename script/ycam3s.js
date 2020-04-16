@@ -239,9 +239,9 @@ var ycam = {
     return new Promise(function(resolve){
   	  sock.send(cmd,0,cmd.length,port,who.param.address,function(err,bytes){
     		if(err){
-          console.log('ycam3-restart::send error');
-          resolve(false);
-        }
+              console.log('ycam3-restart::send error');
+              resolve(false);
+            }
 	    	else{
           const wdt=setTimeout(function(){
             sock.close();

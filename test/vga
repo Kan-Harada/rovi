@@ -1,0 +1,3 @@
+#!/bin/sh
+
+roslaunch rovi ycam3vga.launch
