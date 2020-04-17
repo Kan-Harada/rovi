@@ -1,0 +1,3 @@
+#!/bin/sh
+
+python ~/catkin_ws/src/rovi/test/livec.py $1

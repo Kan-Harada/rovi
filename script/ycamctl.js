@@ -28,7 +28,7 @@ const liveFps=10;
 //位相シフト撮影枚数
 const psCnt=13;
 //ライブON/OFF
-const Livef=1;
+const Livef=0;
 
 function sleep(msec){return new Promise(function(resolve){setTimeout(function(){resolve(true);},msec);});}
 function add_sendmsg(pub){
