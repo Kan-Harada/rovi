@@ -38,6 +38,7 @@ function add_sendmsg(pub){
     pub.publish(m);
   }
 }
+// プロセス終了時待ち(撮影残りがなくなるのを期待・・)
 process.on('exit',async function() {
   ros.log.info('ycamctl exiting...');
   await sleep(1000);
@@ -48,14 +49,16 @@ setImmediate(async function() {
 // 初期化部
 //=============
   const rosNode = await ros.initNode(NSycamctrl);
+  // 画像受信オブジェクトを生成
   const image_L = new ImageSwitcher(rosNode, NScamL);
   const image_R = new ImageSwitcher(rosNode, NScamR);
-//---------publisher and subscriber 1/2
+  // ログ等出力トピック参照
   const pub_stat = rosNode.advertise(NSrovi + '/stat', std_msgs.Bool);
   const pub_error = rosNode.advertise('/error', std_msgs.String);
   add_sendmsg(pub_error);
   const pub_info = rosNode.advertise('/message', std_msgs.String);
   add_sendmsg(pub_info);
+  // 位相シフト結果出力トピック
   const pub_pcount=rosNode.advertise(NSrovi+'/pcount',std_msgs.Int32);
   const pub_Y1=rosNode.advertise(NSrovi+'/Y1',std_msgs.Bool);
   const genpc=rosNode.serviceClient(NSgenpc, rovi_srvs.GenPC, { persist: true });
@@ -63,6 +66,7 @@ setImmediate(async function() {
     ros.log.error('genpc service not available');
     return;
   }
+  // カメラパラメータ参照
   const param_camnode=await rosNode.getParam(NSrovi + '/camera');
   let param={
     camps: new Notifier(rosNode,NSps + '/camera'),//Genpc mode camera params
@@ -73,11 +77,13 @@ setImmediate(async function() {
 //=============
 // イベント処理部
 //=============
+  // ライブパラメータ変更->設定有効化
   param.camlv.on('change',async function(key,val){
     let obj={};
     obj[key]=val;
     await sens.cset(obj);
   });
+  // プロジェクターパラメータ変更->設定有効化
   param.proj.on('change',async function(key,val){
     let obj={};
     obj[key]=val;
@@ -90,6 +96,7 @@ setImmediate(async function() {
      }
     }
   });
+// カメライベント取得用オブジェクト 
   let sensEv=await sens.open(rosNode, NSrovi, param_camnode);
   sensEv=SensControl.assign(sensEv);
 // 起動時処理  
@@ -180,35 +187,43 @@ setImmediate(async function() {
       obj['Mode2']=1;
       await sens.pset(obj);
       await sens.cset(param.camps.objs); //---overwrites genpc camera params
-      let wdt=setTimeout(async function() { //---start watch dog
+      // 位相シフト撮影全体のタイムアウトを設定
+      let wdt=setTimeout(async function() {
+        // タイムアウト時の異常処理
         ps2live(1000);
         const errmsg = 'pshift_genpc timed out';
         pub_error.sendmsg(errmsg);
         res.success = false;
         res.message = errmsg;
         pub_Y1.publish(new std_msgs.Bool());
-        resolve(true);
+        resolve(true); // Promiseなのでresolveしておく
       }, param.proj.objs.Interval*psCnt + 1000);
-//for monitoring
-     let icnt=0;
-     image_L.hook.on('store',function(img,t2){
-       let t1=img.header.stamp;
-       ros.log.info(('00'+icnt.toString(10)).substr(-2)+' '+(t1.nsecs*1e-9+t1.secs)+' '+(t2.nsecs*1e-9+t2.secs));
-       icnt++;
-     });
+
+      // 画像キャプチャのログ表示(storeイベントをキャッチ)
+      let icnt=0;
+      image_L.hook.on('store',function(img,t2){
+        let t1=img.header.stamp;
+        ros.log.info(('00'+icnt.toString(10)).substr(-2)+' '+(t1.nsecs*1e-9+t1.secs)+' '+(t2.nsecs*1e-9+t2.secs));
+        icnt++;
+      });
 
       ros.log.info('Ready to store');
+      // タイムアウト後にカメラに撮影枚数を書込(撮影開始)
       setTimeout(function(){
           if(psCnt==13) sens.cset({'CaptureCnt': 0x0d});
           else if(psCnt==4) sens.cset({'CaptureCnt': 0xfff2000d});
 //           sens.cset({'CaptureCnt': 0xfdf2020d});
         },
-        95
+        95 //タイムアウト値
       );
+      // 画像受信待ちに入るまでタイマで待つ
       await sleep(100);
+      // 画像データ受信モードに入る
       let imgs;
       try{
+        // 13枚撮影完了待ち
         imgs=await Promise.all([image_L.store(psCnt),image_R.store(psCnt)]); //---switch to "store" mode
+        // プロジェクター発光しないモードに変更
         obj['Mode2']=0;
         await sens.pset(obj);
       }
@@ -224,6 +239,8 @@ setImmediate(async function() {
         return;
       }
       clearTimeout(wdt);
+
+      // 13枚位相シフト撮影の時のみgenpcを呼出す
       if(psCnt==13) {
         let gpreq = new rovi_srvs.GenPC.Request();
         gpreq.imgL = imgs[0];
@@ -246,6 +263,7 @@ setImmediate(async function() {
         let tp=Math.floor(gpres.pc_cnt*0.0001)+10;
         ros.log.info('Time to publish pc '+tp+' ms');
       }
+      //1000ミリ秒後、ライブに戻る
       ps2live(1000);
       let finish=new std_msgs.Bool();
       finish.data=res.success;
@@ -254,8 +272,9 @@ setImmediate(async function() {
     });
   }
 
-//---------publisher and subscriber 2/2
+// 点群数Publish(/rovi/pcount)
   const svc_X1=rosNode.advertiseService(NSps, std_srvs.Trigger, psgenpc);
+// 撮影トピック(/rovi/X1) callbackもここに記述
   const sub_X1=rosNode.subscribe(NSrovi+'/X1',std_msgs.Bool,async function(){
     if (!sens.normal){
       pub_error.sendmsg('request cancelled due to YCAM status');
@@ -265,9 +284,6 @@ setImmediate(async function() {
     let req=new std_srvs.Trigger.Request();
     let res=new std_srvs.Trigger.Response();
     let ret=psgenpc(req,res);
-//  if(typeof(ret)=='boolean'){ //request refused
-//    pub_Y1.publish(new std_msgs.Bool());
-//  }
   });
   const svc_reset = rosNode.subscribe(NSrovi+'/reset',std_msgs.Bool,async function(){
     await sens.reset();
